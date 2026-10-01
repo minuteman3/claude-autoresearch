@@ -1,0 +1,7 @@
+{
+  "name": "claude-autoresearch",
+  "owner": { "name": "Miles McGuire" },
+  "plugins": [
+    { "name": "autoresearch", "source": "./", "description": "Autoresearch loop: skill, tools and live dashboard" }
+  ]
+}
