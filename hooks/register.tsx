@@ -160,7 +160,9 @@ export const register: Register = on => {
     const notes: string[] = []
     if (status === 'keep') {
       await $.process.run(['git', 'add', '-A'])
-      const c = await $.process.run(['git', 'commit', '-m', `ar: ${desc}`])
+      // The message goes through a file so the git command line is fixed text.
+      await $.fs.write('.auto/commit-msg', `ar: ${desc}\n`)
+      const c = await $.process.run(['git', 'commit', '-F', '.auto/commit-msg'])
       if (c.exitCode) return { result: `git commit failed, nothing logged:\n${c.stdout}${c.stderr}`, isError: true }
     } else if (status !== 'baseline') {
       await $.process.run(['git', 'checkout', '--', '.'])

@@ -47,12 +47,59 @@ Then ask Claude to "autoresearch <what to optimize>".
 
 ## What the mod runs, reads, and writes
 
-- `run` starts `bash` with the fixed argument `.auto/measure.sh` for each measurement and, when requested and present, with the fixed argument `.auto/checks.sh`. Both scripts run from the session working directory. They are supplied by the project being measured and can run commands available to the user; inspect them before use. Running these scripts is why the mod starts `bash`. It does not download programs or files. Start the Claude Code session from the repository root: the mod looks for `.auto/` only in the session working directory.
-- `run` reads `.auto/config.json`, `.auto/log.jsonl`, `.auto/measure.sh`, and, when requested, `.auto/checks.sh`. It records the pending result in `.auto/.pending.json`.
-- `log` reads `.auto/.pending.json`, `.auto/log.jsonl`, and the current Git commit. It appends the run to `.auto/log.jsonl` and clears `.auto/.pending.json`.
-- All mod file operations use fixed paths relative to the session working directory. It writes only `.auto/.pending.json` and `.auto/log.jsonl`; it does not write build, startup, settings, or instruction files. The experiment scripts themselves may have other side effects.
-- `log` invokes the local `git` program, because keeping or discarding an experiment means committing or reverting the code change it made. It runs git to stage and commit (`git add -A`, `git commit -m "ar: <desc>"`), revert (`git checkout -- .`), clean untracked files (`git clean -fd -e .auto`), and read the short commit id (`git rev-parse --short HEAD`). `<desc>` is the experiment description passed to `log`; it is the only argument that is not fixed text. These operations may discard uncommitted changes or remove untracked files outside `.auto/`; inspect the working tree before using a reverting status. `baseline` only records the result.
-- The mod makes no network or HTTP requests and sends no data to a remote service. The `run` result (metrics, samples, and recent script output on failure) and the `stats`, `tail`, and `summary` results are returned to Claude Code as tool results; `tail` can include experiment descriptions and notes from `.auto/log.jsonl`. These results are visible in the conversation. `log` returns a short status string. The tool-call hooks implement the registered `run`, `log`, `stats`, `tail`, and `summary` tools and return their results in place of those tool calls. A separate Bash hook reads the command text in memory only to detect `.auto/` edits and refresh the dashboard, then returns Bash's original result through `next`. The `autoresearch-dash` `command.run` hook opens the dashboard and returns a short status message; closing the pane restores the status-line nudge.
+The mod works only in the session working directory, so start Claude Code from the repository
+root. Every path and command below is fixed text in the code.
+
+### Programs it runs
+
+- `bash .auto/measure.sh`, once per measurement, and `bash .auto/checks.sh` when `run` is called
+  with `checks: true` and the file exists. Running the project's own benchmark and check scripts
+  is the purpose of the plugin, and `bash` is how they are started. The scripts are written for
+  the project being measured (the skill drafts them with you) and can run any command available
+  to the user, so read them before starting a session. The mod does not download programs or files.
+- `git`, from `log`, because keeping an experiment means committing its code change and
+  discarding one means reverting it:
+  - `keep`: `git add -A`, then `git commit -F .auto/commit-msg`.
+  - `discard`, `checks_failed`, `crash`: `git checkout -- .` and `git clean -fd -e .auto`. These
+    discard uncommitted changes and remove untracked files outside `.auto/`, which is why the skill
+    requires a clean tree on a dedicated branch.
+  - every status: `git rev-parse --short HEAD` to record the commit.
+
+  All of these act on the local repository only. The mod never runs `git push`, `fetch`, `pull`
+  or `clone`, or any other command that contacts a remote.
+
+### Files it reads and writes
+
+- Reads `.auto/config.json`, `.auto/log.jsonl`, `.auto/.pending.json`, and checks whether
+  `.auto/checks.sh` exists.
+- Writes only inside `.auto/`: `.auto/.pending.json` (the last `run` result, waiting for `log`),
+  `.auto/log.jsonl` (one line appended per logged run) and `.auto/commit-msg` (`ar: <description>`,
+  the message for `git commit -F`). It does not write build, startup, settings or instruction
+  files. The experiment scripts may of course change other files; that is the experiment.
+
+### What it sends, and where
+
+Nothing leaves the machine. The mod makes no network or HTTP requests, and none of the programs
+above contact a remote service. Its tool results go back to Claude Code, into the conversation:
+`run` returns metrics, samples and, on failure, the last 2 KB of script output; `stats`, `tail`
+and `summary` return data from `.auto/log.jsonl`, including experiment descriptions and notes;
+`log` returns a one-line status. The status line and dashboard show the same data locally.
+
+### Hooks
+
+- `session.start`: registers the five tools and the `/autoresearch-dash` command, and opens the
+  dashboard if an `.auto/` session already exists; then continues through `next`.
+- `tool.call` on `mcp__autoresearch__run`, `log`, `stats`, `tail` and `summary`: these are the
+  mod's own tools, and the hooks implement them. Each returns its own result because no other
+  tool exists to run in its place. The mod answers for no other tool.
+- `tool.call` on `Bash`: runs the Bash command unchanged through `next` and returns its result
+  unchanged. Afterwards, if the command text contains `.auto/`, it re-reads `.auto/` to refresh
+  the dashboard. The command text is not stored or sent anywhere.
+- `command.run` on `autoresearch-dash`: answers only that command, opening the dashboard and
+  returning a one-line message. It does not see or change other commands.
+- `ui.close`: passes every close through `next`; when the dashboard closes, it puts the
+  "/autoresearch-dash for details" hint back in the status line.
+- `ui.render` for the dashboard pane: draws the pane.
 
 ## Development
 
