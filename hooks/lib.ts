@@ -10,7 +10,7 @@ export type Entry = {
 export const STATUSES = ['baseline', 'keep', 'discard', 'checks_failed', 'crash'] as const
 
 export const EMPTY: Snapshot = {
-  active: false, dir: '', metric: '', direction: 'min', baseline: null, best: null, bestRun: null,
+  active: false, metric: '', direction: 'min', baseline: null, best: null, bestRun: null,
   noise: null, runs: [], counts: {},
 }
 
@@ -95,7 +95,7 @@ export function summary(cfg: Config, es: Entry[]): string {
   return lines.join('\n')
 }
 
-export function snapshot(cfg: Config, es: Entry[], dir = ''): Snapshot {
+export function snapshot(cfg: Config, es: Entry[]): Snapshot {
   const mad = noise(es)
   let baseline: number | null = null, best: number | null = null, bestRun: number | null = null
   const counts: Record<string, number> = {}
@@ -117,7 +117,7 @@ export function snapshot(cfg: Config, es: Entry[], dir = ''): Snapshot {
     }
     return run
   })
-  return { active: true, dir, metric: cfg.metric ?? '', direction: cfg.direction, maxIterations: cfg.maxIterations,
+  return { active: true, metric: cfg.metric ?? '', direction: cfg.direction, maxIterations: cfg.maxIterations,
     baseline, best, bestRun, noise: mad, runs, counts }
 }
 

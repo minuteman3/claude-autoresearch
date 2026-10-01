@@ -8,7 +8,7 @@ export type Run = {
   samples: number[]; seconds?: number; checksOk?: boolean
 }
 export type Snapshot = {
-  active: boolean; dir: string; metric: string; direction: 'min' | 'max'; maxIterations?: number
+  active: boolean; metric: string; direction: 'min' | 'max'; maxIterations?: number
   baseline: number | null; best: number | null; bestRun: number | null
   noise: number | null; runs: Run[]; counts: Record<string, number>
 }

@@ -15,14 +15,7 @@ const selected = atom({ plugin: 'autoresearch', key: 'selected' } as const, null
 const running = atom({ plugin: 'autoresearch', key: 'running' } as const, null)
 const now = atom({ plugin: 'autoresearch', key: 'now' } as const, 0)
 
-// Paths are relative to the session cwd unless a tool call passes `dir` (the repo root).
-let LOG = '.auto/log.jsonl', PENDING = '.auto/.pending.json', CFG = '.auto/config.json', ROOT: string | undefined
-function useDir(dir: unknown) {
-  ROOT = typeof dir === 'string' && dir ? dir.replace(/\/$/, '') : undefined
-  const at = (f: string) => (ROOT ? `${ROOT}/${f}` : f)
-  LOG = at('.auto/log.jsonl'); PENDING = at('.auto/.pending.json'); CFG = at('.auto/config.json')
-  return at
-}
+const LOG = '.auto/log.jsonl', PENDING = '.auto/.pending.json', CFG = '.auto/config.json'
 
 const STATUS: Record<string, { color: string; label: string }> = {
   baseline: { color: 'cyan', label: 'baseline' },
@@ -46,7 +39,7 @@ async function refresh($: EngineInterface) {
   try {
     if ((await $.fs.exists(LOG)) || (await $.fs.exists(CFG))) {
       const { cfg, es } = await load($)
-      next = snapshot(cfg, es, ROOT ?? '')
+      next = snapshot(cfg, es)
     }
   } catch {
     return // half-written log line mid-append: keep the last good view
@@ -68,8 +61,7 @@ async function showStatus($: EngineInterface, closing = false) {
 const json = (v: unknown) => JSON.stringify(v, null, 1)
 // Streams the script so a benchmark may run as long as it needs (time waiting on the process
 // is not charged to the hook's budget); `timeoutMs` kills it, reading as exit 124 like timeout(1).
-async function sh($: EngineInterface, script: string, timeoutMs?: number) {
-  const it = $.process.spawn({ argv: ['bash', script], cwd: ROOT })[Symbol.asyncIterator]()
+async function sh($: EngineInterface, it: AsyncIterator<any>, timeoutMs?: number) {
   let stdout = '', stderr = '', timedOut = false
   const timer = timeoutMs ? $.clock.after(timeoutMs, () => { timedOut = true; void it.return?.(undefined as never) }) : undefined
   try {
@@ -88,9 +80,6 @@ async function sh($: EngineInterface, script: string, timeoutMs?: number) {
     timer?.cancel()
   }
 }
-const git = ($: EngineInterface, ...args: string[]) => $.process.run(['git', ...args], { cwd: ROOT })
-const DIR = { type: 'string', description: 'Repo root holding .auto/ (default: session cwd)' }
-
 const signed = (p: number) => `${p >= 0 ? '+' : ''}${p.toFixed(1)}%`
 const ago = (ms: number) => (ms < 60_000 ? `${Math.floor(ms / 1000)}s` : `${Math.floor(ms / 60_000)}m ${Math.floor((ms % 60_000) / 1000)}s`)
 
@@ -101,7 +90,6 @@ export const register: Register = on => {
       name: 'run',
       description: 'Autoresearch: run .auto/measure.sh (median of `repeats` runs), optionally .auto/checks.sh, and compare to the best so far. Saves the result as pending for `log`. Returns metrics, samples, seconds, checks_ok and stats (improves, delta_pct, confidence, verdict).',
       inputSchema: { type: 'object', properties: {
-        dir: DIR,
         repeats: { type: 'integer', minimum: 1, description: 'Defaults to config.repeats' },
         checks: { type: 'boolean', description: 'Also run .auto/checks.sh' },
         timeoutSec: { type: 'integer', minimum: 1, description: 'Kill measure.sh/checks.sh after this many seconds (default: no limit)' },
@@ -111,22 +99,21 @@ export const register: Register = on => {
       name: 'log',
       description: 'Autoresearch: record the pending run in .auto/log.jsonl AND do the git step. keep: commits all changes ("ar: <desc>") and logs the new HEAD. discard / checks_failed / crash: reverts the working tree (git checkout -- . && git clean -fd, .auto kept). baseline: logs only.',
       inputSchema: { type: 'object', required: ['status', 'desc'], properties: {
-        status: { enum: [...STATUSES] }, dir: DIR, desc: { type: 'string' }, why: { type: 'string' },
+        status: { enum: [...STATUSES] }, desc: { type: 'string' }, why: { type: 'string' },
       } },
     })
-    await $.tool.register({ name: 'stats', description: 'Autoresearch: baseline, best, run count, noise (MAD) for the .auto/ session.', inputSchema: { type: 'object', properties: { dir: DIR } } })
+    await $.tool.register({ name: 'stats', description: 'Autoresearch: baseline, best, run count, noise (MAD) for the .auto/ session in the session working directory.', inputSchema: { type: 'object', properties: {} } })
     await $.tool.register({
       name: 'tail', description: 'Autoresearch: the last n log entries, compact (default 15).',
-      inputSchema: { type: 'object', properties: { n: { type: 'integer', minimum: 1 }, dir: DIR } },
+      inputSchema: { type: 'object', properties: { n: { type: 'integer', minimum: 1 } } },
     })
-    await $.tool.register({ name: 'summary', description: 'Autoresearch: baseline -> best and a table of kept runs with each delta.', inputSchema: { type: 'object', properties: { dir: DIR } } })
+    await $.tool.register({ name: 'summary', description: 'Autoresearch: baseline -> best and a table of kept runs with each delta in the session working directory.', inputSchema: { type: 'object', properties: {} } })
     await refresh($)
     if ((await read($, snap)).active) void $.ui.open({ id: PANE, title: TITLE })
     return next(e)
   })
 
   on('tool.call', { tool: 'mcp__autoresearch__run' }, async ($, e) => {
-    const at = useDir(e.dir)
     const { cfg, es } = await load($)
     const n = typeof e.repeats === 'number' ? e.repeats : cfg.repeats
     const timeout = typeof e.timeoutSec === 'number' ? e.timeoutSec * 1000 : undefined
@@ -139,9 +126,9 @@ export const register: Register = on => {
     try {
       const samples: Record<string, number>[] = []
       for (let i = 0; i < n; i++) {
-        const r = await sh($, at('.auto/measure.sh'), timeout)
+        const r = await sh($, $.process.spawn({ argv: ['bash', '.auto/measure.sh'] })[Symbol.asyncIterator](), timeout)
         if (r.exitCode !== 0) {
-          await $.fs.write(PENDING, JSON.stringify({ crash: true }))
+          await $.fs.write('.auto/.pending.json', JSON.stringify({ crash: true }))
           return { result: json({ crash: true, exitCode: r.exitCode, tail: (r.stdout + r.stderr).slice(-2000) }) }
         }
         const m = parseMetrics(r.stdout)
@@ -153,12 +140,12 @@ export const register: Register = on => {
         metrics, samples: samples.map(s => primary(s, cfg)), seconds: Math.round((Date.now() - t0) / 10) / 100,
       }
       let checksTail: string | undefined
-      if (e.checks && (await $.fs.exists(at('.auto/checks.sh')))) {
-        const r = await sh($, at('.auto/checks.sh'), timeout)
+      if (e.checks && (await $.fs.exists('.auto/checks.sh'))) {
+        const r = await sh($, $.process.spawn({ argv: ['bash', '.auto/checks.sh'] })[Symbol.asyncIterator](), timeout)
         res.checks_ok = r.exitCode === 0
         if (r.exitCode) checksTail = (r.stdout + r.stderr).slice(-2000)
       }
-      await $.fs.write(PENDING, JSON.stringify(res))
+      await $.fs.write('.auto/.pending.json', JSON.stringify(res))
       return { result: json({ ...res, checks_tail: checksTail, stats: stats(cfg, es, primary(metrics, cfg)) }) }
     } finally {
       tick.cancel()
@@ -168,46 +155,42 @@ export const register: Register = on => {
   })
 
   on('tool.call', { tool: 'mcp__autoresearch__log' }, async ($, e) => {
-    useDir(e.dir)
     const status = String(e.status), desc = String(e.desc), why = String(e.why ?? '')
     if (!(STATUSES as readonly string[]).includes(status)) return { result: `bad status ${status}`, isError: true }
     const notes: string[] = []
     if (status === 'keep') {
-      await git($, 'add', '-A')
-      const c = await git($, 'commit', '-m', `ar: ${desc}`)
+      await $.process.run(['git', 'add', '-A'])
+      const c = await $.process.run(['git', 'commit', '-m', `ar: ${desc}`])
       if (c.exitCode) return { result: `git commit failed, nothing logged:\n${c.stdout}${c.stderr}`, isError: true }
     } else if (status !== 'baseline') {
-      await git($, 'checkout', '--', '.')
-      await git($, 'clean', '-fd', '-e', '.auto')
+      await $.process.run(['git', 'checkout', '--', '.'])
+      await $.process.run(['git', 'clean', '-fd', '-e', '.auto'])
       notes.push('working tree reverted')
     }
     const pending = (await readOr($, PENDING)) ?? '{}'
     const { es } = await load($)
-    const commit = (await git($, 'rev-parse', '--short', 'HEAD')).stdout.trim()
+    const commit = (await $.process.run(['git', 'rev-parse', '--short', 'HEAD'])).stdout.trim()
     const entry: Entry = {
       run: es.length + 1, ts: new Date().toISOString().slice(0, 19), status, desc, why, commit,
       ...JSON.parse(pending),
     }
     const prev = (await readOr($, LOG)) ?? ''
-    await $.fs.write(LOG, prev + JSON.stringify(entry) + '\n')
-    await $.fs.write(PENDING, '{}')
+    await $.fs.write('.auto/log.jsonl', prev + JSON.stringify(entry) + '\n')
+    await $.fs.write('.auto/.pending.json', '{}')
     await refresh($)
     if (status === 'keep') $.ui.toast(`autoresearch: kept #${entry.run} ${desc}`)
     return { result: [`logged run ${entry.run} [${status}] ${desc} @ ${commit}`, ...notes].join('; ') }
   })
 
   on('tool.call', { tool: 'mcp__autoresearch__stats' }, async ($, e) => {
-    useDir(e.dir)
     const { cfg, es } = await load($)
     return { result: json(stats(cfg, es)) }
   })
   on('tool.call', { tool: 'mcp__autoresearch__tail' }, async ($, e) => {
-    useDir(e.dir)
     const { cfg, es } = await load($)
     return { result: tail(cfg, es, typeof e.n === 'number' ? e.n : 15) }
   })
   on('tool.call', { tool: 'mcp__autoresearch__summary' }, async ($, e) => {
-    useDir(e.dir)
     const { cfg, es } = await load($)
     return { result: summary(cfg, es) }
   })

@@ -29,7 +29,8 @@ plugin also shows a status-line summary and a live experiment dashboard (`/autor
 1. If `.auto/prompt.md` exists → skip to **Resume**.
 2. Ask only what can't be inferred: goal metric & direction, how to measure, what files are
    in scope, what must not break, iteration/time budget. Propose defaults from the repo.
-3. Require a clean git tree. Create branch `autoresearch/<slug>-<date>`.
+3. Work from the repository root: the tools read `.auto/` in the session working directory.
+   Require a clean git tree. Create branch `autoresearch/<slug>-<date>`.
 4. Write `.auto/*`. Make `measure.sh` fast (seconds–minutes), deterministic where possible,
    and print `METRIC`. Add `.auto/` to `.git/info/exclude`.
 5. Baseline: `run {repeats: 3}` then `log {status: baseline, desc: baseline}`.
