@@ -10,10 +10,10 @@ import type { Run } from '../types'
 
 const PANE = 'autoresearch'
 const TITLE = 'Autoresearch'
-const snap = atom({ plugin: 'autoresearch', key: 'snap' } as const, EMPTY)
-const selected = atom({ plugin: 'autoresearch', key: 'selected' } as const, null)
-const running = atom({ plugin: 'autoresearch', key: 'running' } as const, null)
-const now = atom({ plugin: 'autoresearch', key: 'now' } as const, 0)
+const snap = atom({ plugin: 'autoscience', key: 'snap' } as const, EMPTY)
+const selected = atom({ plugin: 'autoscience', key: 'selected' } as const, null)
+const running = atom({ plugin: 'autoscience', key: 'running' } as const, null)
+const now = atom({ plugin: 'autoscience', key: 'now' } as const, 0)
 
 const LOG = '.auto/log.jsonl', PENDING = '.auto/.pending.json', CFG = '.auto/config.json'
 
@@ -113,7 +113,7 @@ export const register: Register = on => {
     return next(e)
   })
 
-  on('tool.call', { tool: 'mcp__autoresearch__run' }, async ($, e) => {
+  on('tool.call', { tool: 'mcp__autoscience__run' }, async ($, e) => {
     const { cfg, es } = await load($)
     const n = typeof e.repeats === 'number' ? e.repeats : cfg.repeats
     const timeout = typeof e.timeoutSec === 'number' ? e.timeoutSec * 1000 : undefined
@@ -154,7 +154,7 @@ export const register: Register = on => {
     }
   })
 
-  on('tool.call', { tool: 'mcp__autoresearch__log' }, async ($, e) => {
+  on('tool.call', { tool: 'mcp__autoscience__log' }, async ($, e) => {
     const status = String(e.status), desc = String(e.desc), why = String(e.why ?? '')
     if (!(STATUSES as readonly string[]).includes(status)) return { result: `bad status ${status}`, isError: true }
     const notes: string[] = []
@@ -184,15 +184,15 @@ export const register: Register = on => {
     return { result: [`logged run ${entry.run} [${status}] ${desc} @ ${commit}`, ...notes].join('; ') }
   })
 
-  on('tool.call', { tool: 'mcp__autoresearch__stats' }, async ($, e) => {
+  on('tool.call', { tool: 'mcp__autoscience__stats' }, async ($, e) => {
     const { cfg, es } = await load($)
     return { result: json(stats(cfg, es)) }
   })
-  on('tool.call', { tool: 'mcp__autoresearch__tail' }, async ($, e) => {
+  on('tool.call', { tool: 'mcp__autoscience__tail' }, async ($, e) => {
     const { cfg, es } = await load($)
     return { result: tail(cfg, es, typeof e.n === 'number' ? e.n : 15) }
   })
-  on('tool.call', { tool: 'mcp__autoresearch__summary' }, async ($, e) => {
+  on('tool.call', { tool: 'mcp__autoscience__summary' }, async ($, e) => {
     const { cfg, es } = await load($)
     return { result: summary(cfg, es) }
   })

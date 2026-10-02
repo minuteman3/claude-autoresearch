@@ -12,7 +12,7 @@ test('dashboard draws list + detail and j/k moves the selection', async ($, on) 
   await $.command.run({ command: 'autoresearch-dash' })
   for (const surface of ['terminal', 'desktop'] as const) {
     const ui = await $.ui.mount({
-      plugin: 'autoresearch', surface, component: 'Pane', requestId: 'autoresearch',
+      plugin: 'autoscience', surface, component: 'Pane', requestId: 'autoresearch',
       props: { title: 'Autoresearch', isFocused: true, bodyColumns: 100, placement: 'dock',
         scroll: { offset: 0, bodyRows: 40 }, view: {} },
     })

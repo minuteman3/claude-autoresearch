@@ -17,7 +17,7 @@ export type Running = { startedAt: number; repeats: number; checks: boolean; las
 
 declare module 'claude-code' {
   interface PluginState {
-    autoresearch: {
+    autoscience: {
       snap: Snapshot
       /** run number shown in the detail panel; null follows the latest */
       selected: number | null

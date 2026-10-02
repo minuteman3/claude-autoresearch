@@ -1,11 +1,12 @@
 {
-  "name": "autoresearch",
-  "displayName": "Autoresearch",
+  "name": "autoscience",
+  "displayName": "Autoscience",
   "version": "0.3.0",
   "description": "Autonomous optimize-measure-keep/discard loop: skill, run/log/stats tools, and a live experiment dashboard",
   "author": {
     "name": "Miles McGuire"
   },
   "repository": "https://github.com/minuteman3/claude-autoresearch",
-  "license": "MIT"
+  "license": "MIT",
+  "keywords": ["autoresearch"]
 }
