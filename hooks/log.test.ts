@@ -14,7 +14,7 @@ test('log keep commits through a fixed git command line', async ($, on) => {
     ran.push(e.argv)
     return { value: { exitCode: 0, stdout: e.argv[1] === 'rev-parse' ? 'abc1234\n' : '', stderr: '' } }
   })
-  const r = await $.tool.call({ tool: 'mcp__autoresearch__log', status: 'keep', desc: 'inline the hot loop; rm -rf $HOME' })
+  const r = await $.tool.call({ tool: 'mcp__autoscience__log', status: 'keep', desc: 'inline the hot loop; rm -rf $HOME' })
   expect(String(r.result)).toContain('logged run 1 [keep]')
   expect(ran).toEqual([['git', 'add', '-A'], ['git', 'commit', '-F', '.auto/commit-msg'], ['git', 'rev-parse', '--short', 'HEAD']])
   expect(files['.auto/commit-msg']).toBe('ar: inline the hot loop; rm -rf $HOME\n')

@@ -27,7 +27,7 @@ test('run streams measure.sh and reports metrics vs best', async ($, on) => {
     expect(e.argv[1]).toBe('.auto/checks.sh')
     return { value: { code: 1, signal: null } } // checks.sh fails
   })
-  const r = await $.tool.call({ tool: 'mcp__autoresearch__run', checks: true })
+  const r = await $.tool.call({ tool: 'mcp__autoscience__run', checks: true })
   const out = JSON.parse(String(r.result))
   expect(out.metrics).toEqual({ ms: 6.5 })
   expect(out.checks_ok).toBe(false)

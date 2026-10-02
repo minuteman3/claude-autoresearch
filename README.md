@@ -14,7 +14,7 @@ pi-autoresearch itself builds on Andrej Karpathy's autoresearch.
   printing `METRIC name=<number>`, optional `checks.sh`), takes a baseline, then iterates one
   hypothesis at a time with noise-aware keep/discard decisions. Resumes from `.auto/` after a
   context reset.
-- **Tools** (a Claude Code mod), listed as `mcp__autoresearch__*`:
+- **Tools** (a Claude Code mod), listed as `mcp__autoscience__*`:
   - `run {repeats?, checks?, timeoutSec?}`: runs `measure.sh` (median of repeats) and `checks.sh`,
     compares with the best so far: Δ%, confidence = |Δ| / noise MAD, verdict.
   - `log {status, desc, why?}`: records the run and does the git step: `keep` commits
@@ -33,7 +33,7 @@ pi-autoresearch itself builds on Andrej Karpathy's autoresearch.
 
 ```
 /plugin marketplace add minuteman3/claude-autoresearch
-/plugin install autoresearch@claude-autoresearch
+/plugin install autoscience@claude-autoresearch
 ```
 
 Or for development: `claude --plugin-dir /path/to/claude-autoresearch`.
@@ -89,7 +89,7 @@ and `summary` return data from `.auto/log.jsonl`, including experiment descripti
 
 - `session.start`: registers the five tools and the `/autoresearch-dash` command, and opens the
   dashboard if an `.auto/` session already exists; then continues through `next`.
-- `tool.call` on `mcp__autoresearch__run`, `log`, `stats`, `tail` and `summary`: these are the
+- `tool.call` on `mcp__autoscience__run`, `log`, `stats`, `tail` and `summary`: these are the
   mod's own tools, and the hooks implement them. Each returns its own result because no other
   tool exists to run in its place. The mod answers for no other tool.
 - `tool.call` on `Bash`: runs the Bash command unchanged through `next` and returns its result

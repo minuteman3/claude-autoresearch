@@ -19,7 +19,7 @@ the notebook, so a fresh context can always resume.
 | `.auto/log.jsonl` | Append-only; one JSON object per run. |
 | `.auto/config.json` | `{"metric":"name","direction":"min|max","maxIterations":N,"repeats":R}` |
 
-Use the **plugin's tools** for the mechanical parts: `mcp__autoresearch__run`,
+Use the **plugin's tools** for the mechanical parts: `mcp__autoscience__run`,
 `…__log`, `…__stats`, `…__tail`, `…__summary`. `log` also does the git step (keep → commit
 all changes as `ar: <desc>`; discard/checks_failed/crash → revert tree, `.auto` kept). The
 plugin also shows a status-line summary and a live experiment dashboard (`/autoresearch-dash`).
