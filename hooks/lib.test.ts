@@ -40,3 +40,23 @@ test('status line summarises and nudges only while the dashboard is hidden', asy
   expect(statusLine(s, null, true)).toBe('autoresearch: best 8 t (20% better than baseline) · 3/50 runs')
   expect(statusLine(s, 12_400, true)).toBe('autoresearch: measuring 12s · best 8 t (20% better than baseline) · 3/50 runs')
 })
+
+test('a new baseline resets baseline, best and noise', async () => {
+  const es = parseLog(log + '\n' + [
+    { run: 4, status: 'baseline', desc: 'new metric', commit: 'b', metrics: { t: 20 }, samples: [20, 21, 19] },
+    { run: 5, status: 'keep', desc: 'z', commit: 'c', metrics: { t: 18 }, samples: [18, 19, 17] },
+  ].map(o => JSON.stringify(o)).join('\n'))
+  const s = snapshot(cfg, es)
+  expect(s.baseline).toBe(20)
+  expect(s.best).toBe(18)
+  expect(s.bestRun).toBe(5)
+  expect(s.noise).toBe(1)
+  expect(s.runs[4]!.deltaPct).toBe(-10)
+  const r = stats(cfg, es, 19) as Record<string, unknown>
+  expect(r.baseline).toBe(20)
+  expect(r.best).toBe(18)
+  expect(r.improves).toBe(false)
+  expect(r.runs).toBe(5)
+  expect(summary(cfg, es)).toContain('total: 20 -> 18 (-10.0%)')
+  expect(summary(cfg, es)).toContain('since re-baseline at #4')
+})

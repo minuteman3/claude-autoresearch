@@ -50,7 +50,15 @@ export function noise(es: Entry[]): number | null {
   return devs.length >= 3 ? median(devs) : null
 }
 
-export function stats(cfg: Config, es: Entry[], candidate?: number | null) {
+// A new baseline (e.g. after the benchmark changed) starts a fresh comparison: baseline, best
+// and noise only count entries from the latest baseline on.
+export function current(es: Entry[]): Entry[] {
+  const i = es.findLastIndex(e => e.status === 'baseline')
+  return i < 0 ? es : es.slice(i)
+}
+
+export function stats(cfg: Config, all: Entry[], candidate?: number | null) {
+  const es = current(all)
   const good = es.filter(e => (e.status === 'baseline' || e.status === 'keep') && e.metrics)
   const vals = good.map(e => primary(e.metrics, cfg)).filter((v): v is number => v != null)
   if (!vals.length) return { error: 'no baseline yet' }
@@ -58,7 +66,7 @@ export function stats(cfg: Config, es: Entry[], candidate?: number | null) {
   for (const v of vals) if (better(v, best, cfg)) best = v
   const mad = noise(es)
   const out: Record<string, unknown> = {
-    baseline: vals[0], best, runs: es.length, direction: cfg.direction, noise_mad: mad,
+    baseline: vals[0], best, runs: all.length, direction: cfg.direction, noise_mad: mad,
   }
   if (candidate != null) {
     out.candidate = candidate
@@ -80,12 +88,14 @@ export function tail(cfg: Config, es: Entry[], n: number): string {
   ).join('\n')
 }
 
-export function summary(cfg: Config, es: Entry[]): string {
+export function summary(cfg: Config, all: Entry[]): string {
+  const es = current(all)
   const keeps = es.filter(e => e.status === 'baseline' || e.status === 'keep')
   if (!keeps.length) return 'nothing logged'
   const b = primary(keeps[0]!.metrics, cfg)!
   let prev = b
-  const lines = [`baseline ${b}  |  ${es.length} runs, ${keeps.length - 1} kept`, '']
+  const since = es.length < all.length ? ` (since re-baseline at #${es[0]!.run}; ${all.length} total)` : ''
+  const lines = [`baseline ${b}  |  ${es.length} runs, ${keeps.length - 1} kept${since}`, '']
   for (const e of keeps.slice(1)) {
     const v = primary(e.metrics, cfg)!
     lines.push(`#${String(e.run).padEnd(4)}${(e.commit ?? '').padEnd(9)}${fmt(v).padEnd(12)}${pct(v, prev).padStart(7)}  ${e.desc}`)
@@ -96,7 +106,7 @@ export function summary(cfg: Config, es: Entry[]): string {
 }
 
 export function snapshot(cfg: Config, es: Entry[]): Snapshot {
-  const mad = noise(es)
+  const mad = noise(current(es))
   let baseline: number | null = null, best: number | null = null, bestRun: number | null = null
   const counts: Record<string, number> = {}
   const runs: Run[] = es.map(e => {
@@ -107,6 +117,7 @@ export function snapshot(cfg: Config, es: Entry[]): Snapshot {
       ts: e.ts ?? '', value, samples: (e.samples ?? []).filter((x): x is number => x != null),
       seconds: e.seconds, checksOk: e.checks_ok,
     }
+    if (e.status === 'baseline') baseline = best = bestRun = null
     if (value != null && best != null) {
       run.deltaPct = (100 * (value - best)) / best
       if (mad) run.confidence = Math.abs(value - best) / mad
