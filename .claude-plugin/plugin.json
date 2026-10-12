@@ -1,7 +1,7 @@
 {
   "name": "autoscience",
   "displayName": "Autoscience",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Autonomous optimize-measure-keep/discard loop: skill, run/log/stats tools, and a live experiment dashboard",
   "author": {
     "name": "Miles McGuire"
